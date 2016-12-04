@@ -1,1 +1,1 @@
-(import ./.).stallmanbot.env
+(import ./.).env
