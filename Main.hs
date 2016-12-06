@@ -22,7 +22,6 @@ data BotState
   = BotState { _lastReminded :: Reminded }
 
 type Msg = Text
--- TODO: refactor out the explicit Channels given to every function
 type Channel = Text
 
 ircbot :: Channel -> IO ()
