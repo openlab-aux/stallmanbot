@@ -44,11 +44,13 @@ reminderMsg   = "Your daily reminder to contribute to free software or GTFO"
 
 handlers :: Channel -> [EventHandler BotState]
 handlers ch = defaultEventHandlers
-  <> [ joinChannel ch
-     , replyToWrongLinux ch
-     , dailyReminder ch ]
+  <> fmap ($ ch) [ joinChannel
+                 , replyToWrongLinux
+                 , dailyReminder ]
 
-joinChannel :: Channel -> EventHandler s
+type MyHandler s = Channel -> EventHandler s
+
+joinChannel :: MyHandler s
 joinChannel ch = EventHandler
   { _description = "join " <> ch
   , _matchType = ENumeric
@@ -57,8 +59,8 @@ joinChannel ch = EventHandler
       _ -> return () }
 
 
-replyToWrongLinux :: Channel -> EventHandler s
-replyToWrongLinux ch = replyIfNotReplyToMe ch rep
+replyToWrongLinux :: MyHandler s
+replyToWrongLinux = replyIfNotReplyToMe rep
   where rep msg | matches msg = Just meintenSieMsg
                 | otherwise   = Nothing
         matches :: Msg -> Bool
@@ -68,7 +70,7 @@ replyToWrongLinux ch = replyIfNotReplyToMe ch rep
         matchReg :: Text -> Msg -> Bool
         matchReg r = R.matchTest (R.makeRegex r :: R.Regex)
 
-dailyReminder :: Channel -> EventHandler BotState
+dailyReminder :: MyHandler BotState
 dailyReminder ch = EventHandler
   { _description = "remind about free software first thing in a day"
   , _matchType = EPrivmsg
@@ -99,8 +101,8 @@ dailyReminder ch = EventHandler
 ---- helpers
 
 -- | reply to messages on a channel if need be
-reply :: Channel -> (Msg -> Maybe Msg) -> EventHandler s
-reply ch rep = EventHandler
+reply :: (Msg -> Maybe Msg) -> MyHandler s
+reply rep ch = EventHandler
   { _description = "reply to something"
   , _matchType = EPrivmsg
   , _eventFunc = \ev -> case _message ev of
@@ -109,7 +111,7 @@ reply ch rep = EventHandler
         | otherwise -> pure ()
       _             -> pure () }
 
-replyIfNotReplyToMe :: Channel -> (Msg -> Maybe Msg) -> EventHandler s
-replyIfNotReplyToMe ch rep = reply ch $ (\msg -> do
-                                            guard . not $ nick `T.isInfixOf` msg
-                                            rep msg)
+replyIfNotReplyToMe :: (Msg -> Maybe Msg) -> MyHandler s
+replyIfNotReplyToMe rep = reply (\msg -> do
+                                      guard . not $ nick `T.isInfixOf` msg
+                                      rep msg)
