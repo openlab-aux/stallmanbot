@@ -1,5 +1,5 @@
 { mkDerivation, base, containers, irc-client, lens, protolude
-, stdenv, text
+, stdenv, text, regex-tdfa-text
 }:
 mkDerivation {
   pname = "stallmanbot";
@@ -8,7 +8,7 @@ mkDerivation {
   isLibrary = false;
   isExecutable = true;
   executableHaskellDepends = [
-    base containers irc-client lens protolude text
+    base containers irc-client lens protolude text regex-tdfa-text
   ];
   license = stdenv.lib.licenses.gpl3;
 }

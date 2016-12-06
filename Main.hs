@@ -7,6 +7,8 @@ import qualified Data.Text as T
 import qualified Data.Time.Clock as TCl
 import qualified Data.Time.Calendar as TCal
 import qualified Control.Concurrent.STM as STM
+import qualified Text.Regex.TDFA as R
+import Text.Regex.TDFA.Text ()
 
 main :: IO ()
 main = ircbot
@@ -34,6 +36,9 @@ meintenSieMsg, reminderMsg :: Msg
 meintenSieMsg = "Meinten Sie: GNU/Linux"
 reminderMsg   = "Your daily reminder to contribute to free software or GTFO"
 
+type Msg = Text
+type Channel = Text
+
 handlers :: [EventHandler BotState]
 handlers = defaultEventHandlers
   <> [ joinAugsburg
@@ -51,9 +56,14 @@ joinAugsburg = EventHandler
 
 replyToWrongLinux :: EventHandler s
 replyToWrongLinux = replyIfNotReplyToMe channel rep
-  where rep msg | " linux " `T.isInfixOf` (T.toLower msg)
-                            = Just meintenSieMsg
-                | otherwise = Nothing
+  where rep msg | matches msg = Just meintenSieMsg
+                | otherwise   = Nothing
+        matches :: Msg -> Bool
+        matches msg = all ($ (T.toLower msg)) $
+            [ matchReg "linux"
+            , not . matchReg "gnu[^a-z]+linux" ]
+        matchReg :: Text -> Msg -> Bool
+        matchReg r = R.matchTest (R.makeRegex r :: R.Regex)
 
 dailyReminder :: EventHandler BotState
 dailyReminder = EventHandler
@@ -84,9 +94,6 @@ dailyReminder = EventHandler
 
 
 ---- helpers
-
-type Msg = Text
-type Channel = Text
 
 -- | reply to messages on a channel if need be
 reply :: Channel -> (Msg -> Maybe Msg) -> EventHandler s
