@@ -11,51 +11,54 @@ import qualified Text.Regex.TDFA as R
 import Text.Regex.TDFA.Text ()
 
 main :: IO ()
-main = ircbot
+main = do
+  headMay <$> getArgs >>= \case
+    Just channel -> ircbot $ toS channel
+    Nothing -> panic "no channel given"
 
 data Reminded = Never | Date TCl.UTCTime
 
 data BotState
   = BotState { _lastReminded :: Reminded }
 
-ircbot :: IO ()
-ircbot = do
+type Msg = Text
+-- TODO: refactor out the explicit Channels given to every function
+type Channel = Text
+
+ircbot :: Channel -> IO ()
+ircbot ch = do
   conn <- connect "chat.freenode.net" 6667 3
   startStateful (conn { _logfunc = stdoutLogger })
-                ((defaultIRCConf nick) { _eventHandlers = handlers })
+                ((defaultIRCConf nick) { _eventHandlers = handlers ch })
                 (BotState
                   -- we don’t want to spam the channel on join
                   { _lastReminded = Never })
 
 nick :: Text
 nick = "GNUpaganda"
-channel :: Text
-channel = "##augsburg"
 
 meintenSieMsg, reminderMsg :: Msg
 meintenSieMsg = "Meinten Sie: GNU/Linux"
 reminderMsg   = "Your daily reminder to contribute to free software or GTFO"
 
-type Msg = Text
-type Channel = Text
 
-handlers :: [EventHandler BotState]
-handlers = defaultEventHandlers
-  <> [ joinAugsburg
-     , replyToWrongLinux
-     , dailyReminder ]
+handlers :: Channel -> [EventHandler BotState]
+handlers ch = defaultEventHandlers
+  <> [ joinChannel ch
+     , replyToWrongLinux ch
+     , dailyReminder ch ]
 
-joinAugsburg :: EventHandler s
-joinAugsburg = EventHandler
-  { _description = "join " <> channel
+joinChannel :: Channel -> EventHandler s
+joinChannel ch = EventHandler
+  { _description = "join " <> ch
   , _matchType = ENumeric
   , _eventFunc = \ev -> case _message ev of
-      Numeric 1 _ -> send $ Join channel
+      Numeric 1 _ -> send $ Join ch
       _ -> return () }
 
 
-replyToWrongLinux :: EventHandler s
-replyToWrongLinux = replyIfNotReplyToMe channel rep
+replyToWrongLinux :: Channel -> EventHandler s
+replyToWrongLinux ch = replyIfNotReplyToMe ch rep
   where rep msg | matches msg = Just meintenSieMsg
                 | otherwise   = Nothing
         matches :: Msg -> Bool
@@ -65,20 +68,20 @@ replyToWrongLinux = replyIfNotReplyToMe channel rep
         matchReg :: Text -> Msg -> Bool
         matchReg r = R.matchTest (R.makeRegex r :: R.Regex)
 
-dailyReminder :: EventHandler BotState
-dailyReminder = EventHandler
+dailyReminder :: Channel -> EventHandler BotState
+dailyReminder ch = EventHandler
   { _description = "remind about free software first thing in a day"
   , _matchType = EPrivmsg
-  , _eventFunc = f channel }
+  , _eventFunc = f ch }
   where
-    f ch ev = case _source ev of
-      Channel msgCh _ -> when (ch == msgCh) $ do
+    f ch' ev = case _source ev of
+      Channel msgCh _ -> when (ch' == msgCh) $ do
         usVar <- _userState <$> ask
         us <- liftIO $ STM.readTVarIO usVar
         now <- liftIO $ TCl.getCurrentTime
         let remindedNow = liftIO $ atomically . STM.writeTVar usVar
                             $ us { _lastReminded = Date now }
-            remind = do send (Privmsg ch (Right reminderMsg))
+            remind = do send (Privmsg ch' (Right reminderMsg))
                         remindedNow
 
         case _lastReminded us of
