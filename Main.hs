@@ -38,7 +38,7 @@ nick = "GNUpaganda"
 
 meintenSieMsg, reminderMsg :: Msg
 meintenSieMsg = "Meinten Sie: GNU/Linux"
-reminderMsg   = "Your daily reminder to contribute to free software or GTFO"
+reminderMsg = "Good morning! Your daily reminder to contribute to free software. ;)"
 
 
 handlers :: Channel -> [EventHandler BotState]
